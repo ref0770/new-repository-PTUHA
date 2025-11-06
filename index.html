@@ -1,0 +1,63 @@
+cd D:\PAPKA\my-electron-pwa
+@'
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <title>Моє портфоліо</title>
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+  <style>
+    :root{
+      --bg:#eef2f6;
+      --card:#ffffff;
+      --ink:#1f2937;
+      --muted:#6b7280;
+      --brand:#1976d2; /* синя лінія як на скріні */
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; background:var(--bg); color:var(--ink);
+      font-family:Segoe UI, Roboto, Arial, sans-serif;
+    }
+    .wrap{max-width:980px; margin:32px auto; padding:0 20px;}
+    .card{
+      background:var(--card);
+      border-radius:12px;
+      box-shadow:0 6px 18px rgba(0,0,0,.08);
+      padding:26px 28px;
+      margin-bottom:22px;
+    }
+    h1,h2{margin:0 0 18px 0; font-weight:800; letter-spacing:.2px;}
+    h1{font-size:44px;}
+    h2{font-size:28px; position:relative; padding-bottom:10px;}
+    h2::after{
+      content:""; position:absolute; left:0; right:0; bottom:0;
+      height:3px; background:var(--brand);
+    }
+    p.lead{margin:0; font-size:18px; color:var(--ink);}
+    ul{margin:12px 0 0 24px;}
+    li{margin:8px 0; font-size:16px;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- Блок 1: Заголовок як на скріні -->
+    <section class="card">
+      <h1>Моє портфоліо</h1>
+      <p class="lead">Вітаю! Це мій перший практичний проєкт в Electron.</p>
+    </section>
+
+    <!-- Блок 2: Мої навички з синьою лінією -->
+    <section class="card">
+      <h2>Мої навички</h2>
+      <ul>
+        <li>HTML5 – Основи</li>
+        <li>CSS – Базові стилі</li>
+        <li>JavaScript – Початківець</li>
+        <li>Electron – Встановлення та запуск</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>
+'@ | Set-Content -Encoding UTF8 .\index.html

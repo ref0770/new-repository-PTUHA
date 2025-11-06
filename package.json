@@ -1,0 +1,14 @@
+{
+  "name": "my-electron-pwa",
+  "version": "1.0.0",
+  "description": "Electron app with PWA-like template",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^31.0.1"
+  }
+}
