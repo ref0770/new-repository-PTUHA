@@ -1,10 +1,13 @@
-﻿<template x-if='!accessToken'>
-  <div class='p-4'>
-    <h2 class='text-xl font-bold mb-4'>Login</h2>
-    <div x-show='error' x-text='error' class='text-red-500 mb-2'></div>
-    <input x-model='username' placeholder='Username (наприклад: @user:matrix.org)' class='border p-2 w-full mb-2 rounded'>
-    <input x-model='password' type='password' placeholder='Password' class='border p-2 w-full mb-2 rounded'>
-    <button @click='login()' class='bg-blue-500 text-white p-2 w-full rounded hover:bg-blue-600 transition'>Login</button>
-    <p class='text-sm text-gray-500 mt-3'>Реєстрація: <a href='https://account.matrix.org/register?kind=manage_account' target='_blank' class='text-blue-600 underline'>account.matrix.org</a></p>
+﻿<template x-if="!accessToken">
+  <div class="login-form">
+    <h2 class="text-xl font-bold mb-4">Вхід в систему</h2>
+    <input x-model="username" placeholder="Ім'я користувача (наприклад, @user:matrix.org)" 
+           class="login-input">
+    <input x-model="password" type="password" placeholder="Пароль" 
+           class="login-input">
+    <button @click="login()" class="login-button">
+      Увійти
+    </button>
+    <p x-text="error" class="error-message"></p>
   </div>
 </template>

@@ -1,161 +1,445 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="uk">
 <head>
   <meta charset="UTF-8">
   <title>Matrix Chat</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/alpinejs" defer></script>
-  
-  <!-- Підключення стилів -->
-  <link rel="stylesheet" href="./styles/main.css">
-  <link rel="stylesheet" href="./login/login.css">
-  <link rel="stylesheet" href="./sidebar/sidebar.css">
+  <style>
+    .index-container{
+        height: 100vh;
+    }
+    .sidebar {
+        min-width: 250px;
+    }
+    .chat-area {
+        flex-grow: 1;
+    }
+    .message-input {
+        min-height: 80px;
+    }
+    .room-list li {
+        padding: 8px;
+        transition: background-color 0.2s;
+        list-style: none;
+    }
+    .room-list li:hover {
+        background-color: #e0e7ff;
+    }
+    .room-list li.active {
+        background-color: #bfdbfe;
+        font-weight: 500;
+    }
+    .sidebar-list {
+        height: 76vh;
+        overflow-y: scroll;
+    }
+  </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center p-4">
-  <!-- Основний контейнер -->
-  <div x-data="chatApp()" class="chat-container bg-white rounded-lg shadow-lg flex w-full max-w-5xl">
-    <!-- Контейнер для сайдбару -->
-    <div id="sidebar-container"></div>
+<body class="index-container bg-gray-100 flex justify-center">
+  <div x-data="chatApp()" :class="accessToken ? '' : 'items-center'" class="flex w-full">
+    
+    <!-- Сайдбар із кімнатами -->
+    <template x-if="accessToken">
+      <div class="sidebar p-4 bg-gray-50 border-r border-gray-200 overflow-y-auto">
+        <h2 class="text-xl font-bold mb-4">Кімнати</h2>
+        <div class="room-list space-y-1 px-4">
+          <ul class="sidebar-list">
+            <template x-for="room in rooms" :key="room.roomId">
+              <li
+                @click="switchRoom(room.roomId)"
+                :class="{ 'active': room.roomId === roomId }"
+                x-text="room.name || room.roomId"
+                class="cursor-pointer rounded-lg"
+              ></li>
+            </template>
+          </ul>
+        </div>
+        <div class="mt-4">
+          <input x-model="newRoomName" placeholder="Назва нової кімнати" class="border p-2 w-full mb-2 rounded">
+          <button @click="createRoom()" class="bg-indigo-500 text-white p-2 w-full rounded hover:bg-indigo-600 transition">
+            Створити кімнату
+          </button>
+          <p x-show="newRoomId" class="text-sm text-gray-600 mt-1">
+            ID кімнати: <span x-text="newRoomId"></span>
+          </p>
+        </div>
+      </div>
+    </template>
     
     <!-- Контейнер для основної області чату -->
     <div class="chat-area p-4 flex flex-col w-full">
-      <!-- Контейнер для логіну -->
-      <div id="login-container"></div>
-      
-      <!-- Контейнер для повідомлень (буде показано після логіну) -->
+      <!-- Форма логіну -->
+      <template x-if="!accessToken">
+        <div class="w-96 mx-auto">
+          <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">Вхід в систему</h2>
+          <input x-model="username" placeholder="Ім'я користувача (наприклад, @user:matrix.org)"
+                 class="border border-gray-300 p-3 w-full mb-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          <input x-model="password" type="password" placeholder="Пароль"
+                 class="border border-gray-300 p-3 w-full mb-4 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          <button @click="login()" class="bg-blue-500 hover:bg-blue-600 text-white p-3 w-full rounded-lg transition duration-200 font-medium">
+            Увійти
+          </button>
+          <p x-text="error" class="text-red-500 mt-3 text-center"></p>
+        </div>
+      </template>
+
+      <!-- Чат після авторизації -->
       <template x-if="accessToken">
-        <div class="flex-1 flex flex-col">
-          <!-- Заголовок кімнати -->
-          <div class="border-b border-gray-200 pb-2 mb-4">
-            <h2 x-text="rooms.find(r => r.roomId === roomId)?.name || roomId" class="text-lg font-semibold"></h2>
+        <div class="flex flex-col h-full">
+          <!-- User ID та Room ID -->
+          <div class="mb-2 p-2 bg-gray-200 rounded text-sm break-words flex justify-between">
+            <div>
+              <span class="font-bold">Ваш Matrix ID:</span>
+              <span x-text="userId ? userId : 'Завантаження...'"></span>
+            </div>
+            <div class="text-right">
+              <span class="font-bold">ID кімнати:</span>
+              <span x-text="roomId || 'Не обрано'" class="ml-1 bg-gray-100 p-1 rounded"></span>
+            </div>
           </div>
           
           <!-- Список повідомлень -->
-          <div class="flex-1 overflow-y-auto mb-4 space-y-2">
-            <template x-for="message in messages" :key="message.id">
-              <div class="message p-2 rounded">
-                <span class="font-semibold" x-text="message.sender"></span>:
-                <span x-text="message.body"></span>
+          <div class="flex-1 overflow-y-auto mb-4 p-2 bg-gray-50 rounded border border-gray-200 h-[400px]">
+            <template x-if="messages.length === 0">
+              <p class="text-gray-500 text-center">Повідомлень ще немає. Почніть розмову!</p>
+            </template>
+            <template x-for="msg in messages" :key="msg.id">
+              <div class="mb-2">
+                <strong x-text="msg.sender === userId ? 'Ви' : msg.sender.split(':')[0].substring(1) + ':'"></strong>
+                <span x-text="msg.body" class="ml-2"></span>
               </div>
             </template>
           </div>
           
-          <!-- Поле для вводу повідомлення -->
-          <div class="border-t border-gray-200 pt-4">
-            <textarea 
-              x-model="newMessage" 
-              placeholder="Type your message..." 
-              class="message-input border p-2 w-full rounded"
-              @keydown.enter.prevent="sendMessage()"
-            ></textarea>
-            <button 
-              @click="sendMessage()" 
-              class="bg-green-500 text-white p-2 w-full rounded hover:bg-green-600 transition mt-2"
-            >
-              Send Message
+          <!-- Поле для введення повідомлення -->
+          <div class="mb-4">
+            <textarea x-model="newMessage" placeholder="Введіть ваше повідомлення..." 
+                      class="message-input border p-2 w-full mb-2 rounded resize-y focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            <button @click="sendMessage()" class="bg-green-500 text-white p-2 w-full rounded hover:bg-green-600 transition">
+              Надіслати
             </button>
           </div>
         </div>
       </template>
     </div>
+
+    <!-- Сайдбар із користувачами -->
+    <template x-if="accessToken">
+      <div class="sidebar p-4 bg-gray-50 border-r border-gray-200 overflow-y-auto">
+        <h2 class="text-xl font-bold mb-4">Користувачі</h2>
+        
+        <!-- Список учасників -->
+        <template x-if="accessToken && roomId">
+          <div class="mt-6 p-4 bg-gray-100 rounded-lg">
+            <h3 class="text-sm font-semibold text-gray-700 mb-2">Учасники кімнати</h3>
+            <template x-if="roomMembers.length === 0">
+              <p class="text-xs text-gray-500">Завантаження...</p>
+            </template>
+            <ul class="text-xs space-y-1">
+              <template x-for="member in roomMembers" :key="member.userId">
+                <li class="flex items-center space-x-2">
+                  <span class="font-medium" x-text="member.displayName"></span>
+                  <span class="text-gray-500" x-text="'(' + member.userId.split(':')[0].substring(1) + ')'"></span>
+                </li>
+              </template>
+            </ul>
+          </div>
+        </template>
+        
+        <!-- Запрошення та приєднання -->
+        <div class="space-y-2 mt-4">
+          <div>
+            <input x-model="inviteUser" placeholder="Запросити користувача (наприклад, @user:matrix.org)" class="border p-2 w-full mb-1 rounded">
+            <button @click="inviteUserToRoom()" class="bg-purple-500 text-white p-2 w-full rounded hover:bg-purple-600 transition">
+              Запросити
+            </button>
+          </div>
+          <div>
+            <input x-model="joinRoomId" placeholder="ID кімнати для приєднання (наприклад, !roomId:matrix.org)" class="border p-2 w-full mb-1 rounded">
+            <button @click="joinRoom()" class="bg-yellow-500 text-white p-2 w-full rounded hover:bg-yellow-600 transition">
+              Приєднатися до кімнати
+            </button>
+          </div>
+        </div>
+      </div>
+    </template>
   </div>
 
-  <!-- Підключення JavaScript файлів -->
-  <script src="./login/login.js"></script>
-  <script src="./sidebar/sidebar.js"></script>
-  
   <script>
-    // Додаткові функції для чату
-    async function sendMessage() {
-      if (!this.newMessage.trim() || !this.roomId || !this.accessToken) return;
-      
+    async function login() {
       try {
-        const res = await fetch(`https://matrix.org/_matrix/client/r0/rooms/${encodeURIComponent(this.roomId)}/send/m.room.message`, {
+        this.error = 'Завантаження...';
+        
+        const res = await fetch('https://matrix.org/_matrix/client/r0/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            type: 'm.login.password', 
+            user: this.username, 
+            password: this.password 
+          })
+        });
+        
+        const data = await res.json();
+        if (data.access_token) {
+          this.accessToken = data.access_token;
+          this.userId = data.user_id;
+          this.error = '';
+          await this.fetchRoomsWithNames();
+          this.fetchMessages();
+          
+          setInterval(() => {
+            this.fetchRoomsWithNames();
+            this.fetchMessages();
+          }, 5000);
+        } else {
+          this.error = 'Невірний логін або пароль: ' + (data.error || 'Невідома помилка');
+        }
+      } catch (e) {
+        this.error = 'Помилка під час авторизації: ' + e.message;
+        console.error(e);
+      }
+    }
+
+    async function createRoom() {
+      if (!this.newRoomName.trim()) return;
+      try {
+        const res = await fetch('https://matrix.org/_matrix/client/r0/createRoom', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${this.accessToken}`
           },
-          body: JSON.stringify({
-            msgtype: 'm.text',
-            body: this.newMessage.trim()
+          body: JSON.stringify({ 
+            preset: 'private_chat', 
+            name: this.newRoomName.trim(), 
+            invite: this.inviteUser ? [this.inviteUser.trim()] : [] 
           })
         });
         
         const data = await res.json();
-        if (data.event_id) {
-          this.newMessage = '';
+        if (data.room_id) {
+          this.newRoomId = data.room_id;
+          this.roomId = data.room_id;
+          this.messages = [];
+          this.lastSyncToken = '';
+          await this.fetchRoomsWithNames();
           this.fetchMessages();
+          this.fetchRoomMembers();
+          this.inviteUser = '';
+          alert(`Кімнату "${this.newRoomName}" створено з ID: ${this.newRoomId}`);
+        } else {
+          console.error('Помилка створення кімнати:', data);
+          alert('Помилка створення кімнати: ' + (data.error || 'Невідома помилка'));
         }
       } catch (e) {
-        console.error('Send message error:', e);
+        console.error('Помилка створення кімнати:', e);
+        alert('Помилка створення кімнати: ' + e.message);
       }
     }
 
-    async function fetchMessages() {
-      if (!this.roomId || !this.accessToken) return;
-      
+    async function fetchRoomsWithNames() {
+      if (!this.accessToken) return;
       try {
-        let url = `https://matrix.org/_matrix/client/r0/rooms/${encodeURIComponent(this.roomId)}/messages?dir=b&limit=50`;
-        if (this.lastSyncToken) {
-          url += `&from=${this.lastSyncToken}`;
-        }
+        const res = await fetch('https://matrix.org/_matrix/client/r0/joined_rooms', {
+          headers: { 'Authorization': `Bearer ${this.accessToken}` }
+        });
         
-        const res = await fetch(url, {
+        const data = await res.json();
+        if (data.joined_rooms) {
+          const roomPromises = data.joined_rooms.map(async (roomId) => {
+            try {
+              const nameRes = await fetch(`https://matrix.org/_matrix/client/r0/rooms/${encodeURIComponent(roomId)}/state/m.room.name`, {
+                headers: { 'Authorization': `Bearer ${this.accessToken}` }
+              });
+              
+              if (nameRes.ok) {
+                const nameData = await nameRes.json();
+                return {
+                  roomId,
+                  name: nameData?.name || this.getRoomName(roomId) || roomId
+                };
+              }
+            } catch (e) {
+              console.error('Error fetching room name:', e);
+            }
+            
+            return {
+              roomId,
+              name: this.getRoomName(roomId) || roomId
+            };
+          });
+          
+          this.rooms = (await Promise.all(roomPromises))
+            .sort((a, b) => a.roomId.localeCompare(b.roomId));
+          
+          if (this.rooms.length > 0 && !this.roomId) {
+            this.roomId = this.rooms[0].roomId;
+            this.fetchRoomMembers();
+          }
+        }
+      } catch (e) {
+        console.error('Помилка завантаження кімнат:', e);
+      }
+    }
+
+    function getRoomName(roomId) {
+      return roomId.split(':')[0].replace('!', '').slice(0, 10) + '...';
+    }
+
+    function switchRoom(roomId) {
+      if (roomId) this.roomId = roomId;
+      this.messages = [];
+      this.lastSyncToken = '';
+      this.fetchMessages();
+      this.fetchRoomMembers(); // ← Завантажуємо учасників
+    }
+
+    async function inviteUserToRoom() {
+      if (!this.inviteUser.trim() || !this.roomId) {
+        console.warn('No inviteUser or roomId');
+        return;
+      }
+      try {
+        const res = await fetch(`https://matrix.org/_matrix/client/r0/rooms/${this.roomId}/invite`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.accessToken}`
+          },
+          body: JSON.stringify({ user_id: this.inviteUser.trim() })
+        });
+        const data = await res.json();
+
+        if (data.errcode) {
+          console.error('Invite failed:', data);
+          alert('Помилка запрошення: ' + (data.error || 'Невідома помилка'));
+        } else {
+          this.inviteUser = '';
+          alert('Користувача запрошено до кімнати');
+          await this.fetchRoomsWithNames();
+          this.fetchRoomMembers();
+        }
+      } catch (e) {
+        console.error('Помилка запрошення:', e);
+        alert('Помилка запрошення: ' + e.message);
+      }
+    }
+
+    async function joinRoom() {
+      if (!this.joinRoomId.trim()) return;
+      try {
+        const res = await fetch(`https://matrix.org/_matrix/client/r0/join/${encodeURIComponent(this.joinRoomId.trim())}`, {
+          method: 'POST',
           headers: {
             'Authorization': `Bearer ${this.accessToken}`
           }
         });
-        
         const data = await res.json();
-        if (data.chunk) {
-          this.messages = data.chunk
-            .filter(event => event.type === 'm.room.message')
-            .map(event => ({
-              id: event.event_id,
-              sender: event.sender,
-              body: event.content?.body || ''
-            }));
-          
-          if (data.end) {
-            this.lastSyncToken = data.end;
-          }
+        if (data.room_id) {
+          this.roomId = this.joinRoomId.trim();
+          this.joinRoomId = '';
+          this.messages = [];
+          this.lastSyncToken = '';
+          await this.fetchRoomsWithNames();
+          this.fetchMessages();
+          this.fetchRoomMembers();
+        } else {
+          console.error('Помилка приєднання:', data);
+          alert('Помилка приєднання: ' + (data.error || 'Невідома помилка'));
         }
       } catch (e) {
-        console.error('Fetch messages error:', e);
+        console.error('Помилка приєднання до кімнати:', e);
+        alert('Помилка приєднання до кімнати: ' + e.message);
       }
     }
 
-    function switchRoom(roomId) {
-      this.roomId = roomId;
-      this.messages = [];
-      this.lastSyncToken = '';
-      this.fetchMessages();
+    async function sendMessage() {
+      if (!this.newMessage.trim() || !this.roomId) {
+        console.warn('No message or roomId');
+        return;
+      }
+      const msg = this.newMessage.trim();
+      this.newMessage = '';
+      try {
+        const res = await fetch(`https://matrix.org/_matrix/client/r0/rooms/${this.roomId}/send/m.room.message`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.accessToken}`
+          },
+          body: JSON.stringify({ msgtype: 'm.text', body: msg })
+        });
+        const data = await res.json();
+        if (data.event_id) {
+          this.messages.push({ id: data.event_id, body: msg, sender: this.userId });
+        } else {
+          console.error('Помилка відправки:', data);
+        }
+      } catch (e) {
+        console.error('Помилка відправки повідомлення:', e);
+      }
     }
 
-    function getRoomName(roomId) {
-      // Проста функція для отримання імені кімнати
-      return roomId.split(':')[0].replace('!', '');
+    async function fetchMessages() {
+      if (!this.accessToken || !this.roomId) return;
+      try {
+        const url = this.lastSyncToken ?
+          `https://matrix.org/_matrix/client/r0/sync?since=${this.lastSyncToken}&timeout=30000` :
+          `https://matrix.org/_matrix/client/r0/sync?timeout=30000`;
+        const res = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${this.accessToken}` }
+        });
+        const data = await res.json();
+        if (data.next_batch) {
+          this.lastSyncToken = data.next_batch;
+          if (data.rooms?.join?.[this.roomId]) {
+            const roomData = data.rooms.join[this.roomId];
+            roomData.timeline?.events?.forEach(event => {
+              if (event.type === 'm.room.message' && !this.messages.find(m => m.id === event.event_id)) {
+                this.messages.push({
+                  id: event.event_id,
+                  body: event.content.body,
+                  sender: event.sender
+                });
+              }
+            });
+          }
+          if (data.rooms?.invite) {
+            for (const [room] of Object.entries(data.rooms.invite)) {
+              await this.joinRoom(room);
+            }
+          }
+          await this.fetchRoomsWithNames();
+        } else {
+          console.warn('No next_batch in sync response:', data);
+        }
+      } catch (e) {
+        console.error('Помилка завантаження повідомлень:', e);
+      }
     }
 
-    // Завантаження HTML-шаблонів
-    document.addEventListener('DOMContentLoaded', () => {
-      // Завантаження login.html
-      fetch('./login/login.html')
-        .then(response => response.text())
-        .then(html => {
-          document.getElementById('login-container').innerHTML = html;
-        })
-        .catch(error => console.error('Error loading login:', error));
-
-      // Завантаження sidebar.html
-      fetch('./sidebar/sidebar.html')
-        .then(response => response.text())
-        .then(html => {
-          document.getElementById('sidebar-container').innerHTML = html;
-        })
-        .catch(error => console.error('Error loading sidebar:', error));
-    });
+    async function fetchRoomMembers() {
+      if (!this.accessToken || !this.roomId) return;
+      try {
+        const res = await fetch(
+          `https://matrix.org/_matrix/client/r0/rooms/${encodeURIComponent(this.roomId)}/joined_members`,
+          {
+            headers: { 'Authorization': `Bearer ${this.accessToken}` }
+          }
+        );
+        const data = await res.json();
+        // data.joined — об'єкт { "@user:matrix.org": { display_name: "...", avatar_url: "..." } }
+        this.roomMembers = Object.entries(data.joined || {}).map(([userId, info]) => ({
+          userId,
+          displayName: info.display_name || userId.split(':')[0].substring(1),
+          avatarUrl: info.avatar_url
+        }));
+      } catch (e) {
+        console.error('Error fetching room members:', e);
+      }
+    }
 
     function chatApp() {
       return {
@@ -173,13 +457,26 @@
         inviteUser: '',
         error: '',
         lastSyncToken: '',
+        roomMembers: [],
         login,
         createRoom,
         fetchRoomsWithNames,
+        joinRoom,
+        inviteUserToRoom,
+        getRoomName,
+        switchRoom,
         sendMessage,
         fetchMessages,
-        switchRoom,
-        getRoomName
+        fetchRoomMembers, // ← Додаємо
+        logout() {
+          this.accessToken = '';
+          this.userId = '';
+          this.username = '';
+          this.password = '';
+          this.rooms = [];
+          this.messages = [];
+          this.roomMembers = [];
+        }
       }
     }
   </script>

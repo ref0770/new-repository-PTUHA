@@ -1,0 +1,19 @@
+.chat-message {
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+}
+
+.chat-message.own {
+  background-color: #dbeafe;
+  margin-left: 2rem;
+}
+
+.chat-message.other {
+  background-color: #f3f4f6;
+  margin-right: 2rem;
+}
+
+.message-input {
+  min-height: 80px;
+}

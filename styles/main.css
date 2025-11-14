@@ -2,10 +2,6 @@
   min-height: 80vh;
 }
 
-.sidebar {
-  min-width: 250px;
-}
-
 .chat-area {
   flex-grow: 1;
 }
