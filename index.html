@@ -19,7 +19,6 @@
         min-height: 80px;
     }
     .room-list li {
-        padding: 8px;
         transition: background-color 0.2s;
         list-style: none;
     }
@@ -46,12 +45,17 @@
         <div class="room-list space-y-1 px-4">
           <ul class="sidebar-list">
             <template x-for="room in rooms" :key="room.roomId">
-              <li
-                @click="switchRoom(room.roomId)"
-                :class="{ 'active': room.roomId === roomId }"
-                x-text="room.name || room.roomId"
-                class="cursor-pointer rounded-lg"
-              ></li>
+              <li class="flex items-center justify-between cursor-pointer rounded-lg p-2 hover:bg-indigo-50"
+                  :class="{ 'bg-indigo-100 font-medium': room.roomId === roomId }"
+                  @click="switchRoom(room.roomId)">
+                <!-- Назва кімнати -->
+                <span x-text="room.name || room.roomId" class="flex-1 truncate"></span>
+                <!-- Кнопка видалення -->
+                <button @click.stop="leaveRoom(room.roomId)"
+                        class="ml-2 text-red-500 hover:text-red-700 text-xs font-medium">
+                  × Видалити
+                </button>
+              </li>
             </template>
           </ul>
         </div>
@@ -138,9 +142,18 @@
             </template>
             <ul class="text-xs space-y-1">
               <template x-for="member in roomMembers" :key="member.userId">
-                <li class="flex items-center space-x-2">
-                  <span class="font-medium" x-text="member.displayName"></span>
-                  <span class="text-gray-500" x-text="'(' + member.userId.split(':')[0].substring(1) + ')'"></span>
+                <li class="flex items-center justify-between">
+                  <div>
+                    <span class="font-medium" x-text="member.displayName"></span>
+                    <span class="text-gray-500" x-text="'(' + member.userId.split(':')[0].substring(1) + ')'"></span>
+                  </div>
+                  <!-- Кнопка видалення юзера (kick) -->
+                  <button
+                    @click.stop="kickUser(member.userId)"
+                    class="text-red-600 hover:text-red-800 text-xs font-bold ml-2"
+                    title="Викинути з кімнати">
+                    ×
+                  </button>
                 </li>
               </template>
             </ul>
@@ -293,7 +306,7 @@
       this.messages = [];
       this.lastSyncToken = '';
       this.fetchMessages();
-      this.fetchRoomMembers(); // ← Завантажуємо учасників
+      this.fetchRoomMembers();
     }
 
     async function inviteUserToRoom() {
@@ -430,7 +443,6 @@
           }
         );
         const data = await res.json();
-        // data.joined — об'єкт { "@user:matrix.org": { display_name: "...", avatar_url: "..." } }
         this.roomMembers = Object.entries(data.joined || {}).map(([userId, info]) => ({
           userId,
           displayName: info.display_name || userId.split(':')[0].substring(1),
@@ -438,6 +450,86 @@
         }));
       } catch (e) {
         console.error('Error fetching room members:', e);
+      }
+    }
+
+    async function leaveRoom(roomId) {
+      if (!this.accessToken || !roomId) return;
+
+      if (!confirm(`Ви впевнені, що хочете покинути (видалити) кімнату?`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(
+          `https://matrix.org/_matrix/client/r0/rooms/${encodeURIComponent(roomId)}/leave`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${this.accessToken}`
+            }
+          }
+        );
+
+        const data = await res.json();
+
+        if (res.ok) {
+          // Успішно покинуто
+          this.rooms = this.rooms.filter(r => r.roomId !== roomId);
+
+          // Якщо була вибрана саме ця кімната — скидаємо
+          if (this.roomId === roomId) {
+            this.roomId = '';
+            this.messages = [];
+            this.roomMembers = [];
+          }
+
+          alert('Кімнату покинуто.');
+          await this.fetchRoomsWithNames(); // Оновлюємо список
+        } else {
+          console.error('Leave failed:', data);
+          alert('Не вдалося покинути кімнату: ' + (data.error || 'Невідома помилка'));
+        }
+      } catch (e) {
+        console.error('Leave room error:', e);
+        alert('Помилка: ' + e.message);
+      }
+    }
+
+    async function kickUser(userId) {
+      if (!this.accessToken || !this.roomId || !userId) return;
+
+      if (!confirm(`Викинути користувача ${userId} з кімнати?`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(
+          `https://matrix.org/_matrix/client/r0/rooms/${encodeURIComponent(this.roomId)}/kick`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${this.accessToken}`
+            },
+            body: JSON.stringify({ user_id: userId })
+          }
+        );
+
+        const data = await res.json();
+
+        if (res.ok) {
+          // Успішно викинуто
+          this.roomMembers = this.roomMembers.filter(m => m.userId !== userId);
+          alert(`Користувач ${userId} викинутий з кімнати.`);
+          await this.fetchRoomMembers(); // Оновлюємо список
+        } else {
+          console.error('Kick failed:', data);
+          alert('Не вдалося викинути користувача: ' + (data.error || 'Невідома помилка'));
+        }
+      } catch (e) {
+        console.error('Kick error:', e);
+        alert('Помилка: ' + e.message);
       }
     }
 
@@ -467,7 +559,9 @@
         switchRoom,
         sendMessage,
         fetchMessages,
-        fetchRoomMembers, // ← Додаємо
+        fetchRoomMembers,
+        leaveRoom, // ← Додаємо видалення кімнат
+        kickUser,  // ← Додаємо вигнання користувачів
         logout() {
           this.accessToken = '';
           this.userId = '';
